@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77", "wheel>=0.45"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gumlang-tcc"
+version = "0.9.28rc1.dev1"
+description = "Windows x64 TinyCC compiler bundle for the GUM language toolchain"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "LGPL-2.1-or-later"
+license-files = ["LICENSE"]
+
+[project.scripts]
+gum-tcc = "gum_tcc:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gum_tcc"]
+namespaces = false
+
+[tool.setuptools.package-data]
+gum_tcc = ["_payload/**/*"]
