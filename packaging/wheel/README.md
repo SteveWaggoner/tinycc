@@ -38,8 +38,8 @@ py -m venv "C:\temp\gum wheel test"
 
 The smoke check compiles and executes a program using standard headers, memory,
 file I/O, math and Win32 APIs from a path containing spaces. The Windows workflow
-also installs the wheel in a fresh environment, hides compiler toolchains from
-PATH, and runs a small GUM app using the explicitly selected bundled compiler.
+also installs the wheel in a fresh environment and hides compiler toolchains from
+PATH. It needs access only to this repository.
 A hosted build runner with PATH restricted is useful evidence; a separate clean
 Windows VM remains the final check for a release's system dependencies.
 
@@ -56,8 +56,18 @@ GUM still needs automatic discovery of `gum_tcc.compiler_path()` and a condition
 Windows x64 dependency on `gumlang-tcc`. Users' explicit compiler selections
 should retain precedence. Unsupported platforms should continue installing GUM
 without this dependency and use their own compiler. For development, install both
-projects locally and pass the compiler path with GUM's `--cc` option. This package
-alone does not make the existing `pip install gumlang` self-contained.
+projects locally and run the integration smoke check:
+
+```bat
+python -m pip install -e C:\path\to\GumLang
+python packaging\wheel\smoke_gum.py
+```
+
+That script passes the bundled compiler using GUM's `--cc` option. This package
+alone does not make the existing `pip install gumlang` self-contained. The GUM
+check is kept out of this repository's workflow because `GumLang` is private and
+the default Actions token cannot read another private repository. No extra token
+is needed to build or download a compiler wheel.
 
 Threading/async, graphics and arbitrary native SDKs are not promised by the
 compiler smoke test. GUM currently excludes TCC from its threading path.
