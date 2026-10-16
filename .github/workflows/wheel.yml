@@ -1,0 +1,68 @@
+name: Windows compiler wheel
+on:
+  workflow_dispatch:
+  push:
+    paths: ['packaging/wheel/**', '.github/workflows/wheel.yml']
+  pull_request:
+    paths: ['packaging/wheel/**', '.github/workflows/wheel.yml']
+permissions:
+  contents: read
+jobs:
+  windows-wheel:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - run: python -m pip install build wheel setuptools
+      - run: python -m unittest discover -s packaging/wheel/tests -v
+      - name: Build compiler and wheel with MSVC
+        shell: cmd
+        run: |
+          for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" amd64
+          python packaging\wheel\build.py
+      - name: Install artifact in an isolated environment
+        shell: pwsh
+        run: |
+          python -m venv "$env:RUNNER_TEMP\gum wheel install"
+          $python = "$env:RUNNER_TEMP\gum wheel install\Scripts\python.exe"
+          $wheels = @(Get-ChildItem packaging/wheel/dist/*.whl)
+          if ($wheels.Count -ne 1) { throw 'Expected exactly one wheel' }
+          & $python -m pip install --no-index $wheels[0].FullName
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:PATH = "$env:SystemRoot\System32"
+          & $python packaging/wheel/smoke.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/checkout@v4
+        with:
+          repository: SteveWaggoner/GumLang
+          path: gumlang-smoke
+      - name: Compile and run GUM with the installed bundle
+        shell: pwsh
+        run: |
+          $python = "$env:RUNNER_TEMP\gum wheel install\Scripts\python.exe"
+          & $python -m pip install -e ./gumlang-smoke
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $compiler = & $python -c "from gum_tcc import compiler_path; print(compiler_path())"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $app = "$env:RUNNER_TEMP\gum wheel app"
+          New-Item -ItemType Directory -Force $app | Out-Null
+          @'
+          def main() -> int32 {
+              print("GUM bundled TCC passed")
+              return 0
+          }
+          '@ | Set-Content "$app/main.gum"
+          $env:PATH = "$env:SystemRoot\System32"
+          $output = & $python -m gum run "$app/main.gum" --target windows-console --cc $compiler
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $output | Write-Output
+          if (($output -join "`n") -notmatch 'GUM bundled TCC passed') { throw 'Missing GUM output' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gumlang-tcc-win-amd64
+          path: packaging/wheel/dist/*.whl
+          if-no-files-found: error

@@ -1,0 +1,6 @@
+/build/
+/dist/
+/src/*.egg-info/
+/src/gum_tcc/_payload/
+/LICENSE
+__pycache__/
